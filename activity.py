@@ -3,7 +3,6 @@ import time
 import board
 import adafruit_dht
 import adafruit_hcsr04
-import adafruit_tsl2561
 import digitalio
 
 gi.require_version("Gtk", "3.0")
@@ -18,7 +17,6 @@ class RPiSensorActivity(activity.Activity):
         activity.Activity.__init__(self, handle)
         self.max_participants = 1
 
-        # Toolbar
         toolbar_box = ToolbarBox()
         activity_button = ActivityToolbarButton(self)
         toolbar_box.toolbar.insert(activity_button, 0)
@@ -31,94 +29,107 @@ class RPiSensorActivity(activity.Activity):
         self.set_toolbar_box(toolbar_box)
         self.show_all()
 
-        # Set up sensors
         self.setup_sensors()
-
-        # Create GUI elements
         self.create_gui()
-
-        # Update sensor readings every 2 seconds
         GLib.timeout_add_seconds(2, self.update_readings)
 
     def setup_sensors(self):
-        # Initialize the DHT11 sensor
         self.dht_sensor = adafruit_dht.DHT11(board.D4)
-
-        # Initialize the HC-SR04 Ultrasonic sensor
         self.distance_sensor = adafruit_hcsr04.HCSR04(trigger_pin=board.D5, echo_pin=board.D6)
-
-        # # Initialize the TSL2561 Light Sensor
-        # self.light_sensor = adafruit_tsl2561.TSL2561(board.I2C())
-
-        # Initialize the PIR Motion Sensor
         self.pir_sensor = digitalio.DigitalInOut(board.D7)
         self.pir_sensor.direction = digitalio.Direction.INPUT
 
     def create_gui(self):
-        # Main container
-        self.main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
-        self.main_box.set_halign(Gtk.Align.CENTER)
-        self.main_box.set_valign(Gtk.Align.CENTER)
-        self.main_box.set_margin_start(30)
-        self.main_box.set_margin_end(30)
-        self.main_box.set_margin_top(30)
-        self.main_box.set_margin_bottom(30)
-        self.main_box.override_background_color(Gtk.StateFlags.NORMAL, Gdk.RGBA(1, 1, 1, 1))
+        # Main container with gradient background
+        self.main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=30)
+        self.main_box.set_margin_start(40)
+        self.main_box.set_margin_end(40)
+        self.main_box.set_margin_top(40)
+        self.main_box.set_margin_bottom(40)
         self.set_canvas(self.main_box)
 
-        # Container for sensor labels
-        sensor_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
-        sensor_box.set_halign(Gtk.Align.CENTER)
-        sensor_box.set_valign(Gtk.Align.CENTER)
-        sensor_box.set_margin_start(30)
-        sensor_box.set_margin_end(30)
-        sensor_box.set_margin_top(30)
-        sensor_box.set_margin_bottom(30)
+        # Title
+        title_label = Gtk.Label(label="Raspberry Pi Sensor Dashboard")
+        title_label.set_markup("<span font='20' weight='bold'>Raspberry Pi Sensor Dashboard</span>")
+        self.main_box.pack_start(title_label, False, False, 10)
 
-        # Load CSS
+        # Grid for sensor cards
+        grid = Gtk.Grid()
+        grid.set_column_spacing(20)
+        grid.set_row_spacing(20)
+        grid.set_halign(Gtk.Align.CENTER)
+
+        # Create sensor cards
+        self.humidity_card = self.create_sensor_card("Humidity", "#4a90e2")
+        self.distance_card = self.create_sensor_card("Distance", "#2ecc71")
+        self.motion_card = self.create_sensor_card("Motion", "#9b59b6")
+
+        # Add cards to grid
+        grid.attach(self.humidity_card, 0, 0, 1, 1)
+        grid.attach(self.distance_card, 1, 0, 1, 1)
+        grid.attach(self.motion_card, 2, 0, 1, 1)
+
+        self.main_box.pack_start(grid, True, True, 0)
         self.load_css()
-
-        # Humidity label
-        self.humidity_label = Gtk.Label()
-        self.humidity_label.get_style_context().add_class("sensor-label")
-        sensor_box.pack_start(self.humidity_label, False, False, 0)
-
-        # Distance label
-        self.distance_label = Gtk.Label()
-        self.distance_label.get_style_context().add_class("sensor-label")
-        sensor_box.pack_start(self.distance_label, False, False, 0)
-
-        # # Light label
-        # self.light_label = Gtk.Label()
-        # self.light_label.get_style_context().add_class("sensor-label")
-        # sensor_box.pack_start(self.light_label, False, False, 0)
-
-        # Motion label
-        self.motion_label = Gtk.Label()
-        self.motion_label.get_style_context().add_class("sensor-label")
-        sensor_box.pack_start(self.motion_label, False, False, 0)
-
-        # Add sensor box to the main container
-        self.main_box.pack_start(sensor_box, True, True, 0)
         self.main_box.show_all()
+
+    def create_sensor_card(self, title, color):
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        card.set_size_request(200, 150)
+        
+        # Title
+        title_label = Gtk.Label(label=title)
+        title_label.get_style_context().add_class("card-title")
+        card.pack_start(title_label, False, False, 0)
+        
+        # Value
+        value_label = Gtk.Label(label="Loading...")
+        value_label.get_style_context().add_class("card-value")
+        card.pack_start(value_label, True, True, 0)
+        
+        # Add custom CSS class with color
+        card.get_style_context().add_class("sensor-card")
+        card.get_style_context().add_class(f"card-{title.lower()}")
+        
+        return card
 
     def load_css(self):
         css = b"""
-        .sensor-label {
-            background-color: #4a90e2; /* Blue background for labels */
-            border-radius: 10px;
+        .sensor-card {
+            background-color: #ffffff;
+            border-radius: 15px;
             padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 200ms ease;
+        }
+        
+        .sensor-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333333;
+        }
+        
+        .card-value {
             font-family: monospace;
             font-size: 24px;
-            color: #ffffff; /* White text color */
-            margin: 10px;
-            border: 2px solid #2a70b1; /* Darker blue border */
+            color: #ffffff;
         }
-
-        .main-box {
-            background-color: #ffffff; /* White background for the main container */
-            border-radius: 25px; /* Rounded corners for the main container */
-            padding: 20px; /* Padding inside the container */
+        
+        .card-humidity {
+            background: linear-gradient(135deg, #4a90e2, #357abd);
+        }
+        
+        .card-distance {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+        }
+        
+        .card-motion {
+            background: linear-gradient(135deg, #9b59b6, #8e44ad);
         }
         """
         provider = Gtk.CssProvider()
@@ -129,28 +140,23 @@ class RPiSensorActivity(activity.Activity):
 
     def update_readings(self):
         try:
-            # Read humidity
             humidity = self.dht_sensor.humidity
             if humidity is not None:
-                self.humidity_label.set_text(f"Humidity: {humidity:.1f} %")
-            else:
-                self.humidity_label.set_text("Humidity: Error reading")
+                self.humidity_card.get_children()[1].set_text(f"{humidity:.1f} %")
         except RuntimeError as e:
-            self.humidity_label.set_text(f"Humidity: Error reading ({str(e)})")
+            self.humidity_card.get_children()[1].set_text("Error")
 
         try:
-            # Read distance
             distance = self.distance_sensor.distance
-            self.distance_label.set_text(f"Distance: {distance:.1f} cm")
+            self.distance_card.get_children()[1].set_text(f"{distance:.1f} cm")
         except RuntimeError as e:
-            self.distance_label.set_text(f"Distance: Error reading ({str(e)})")
+            self.distance_card.get_children()[1].set_text("Error")
 
         try:
-            # Read motion detection
             motion = self.pir_sensor.value
-            self.motion_label.set_text(f"Motion: {'Detected' if motion else 'Not detected'}")
+            self.motion_card.get_children()[1].set_text('Detected' if motion else 'Not detected')
         except RuntimeError as e:
-            self.motion_label.set_text(f"Motion: Error reading ({str(e)})")
+            self.motion_card.get_children()[1].set_text("Error")
 
         return True
 
